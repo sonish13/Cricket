@@ -1,0 +1,144 @@
+---
+title: "Cricket"
+format: 
+  revealjs:
+    incremental: true 
+editor: visual
+---
+
+### Cricket
+
+#### Bat and ball game
+
+#### Two teams of 11 players take turn to bat and bowl.
+
+#### Objective is to score as much runs as possible .
+
+#### Team with most runs wins the game.
+
+------------------------------------------------------------------------
+
+### Things To know
+
+#### Innings : Two inning in a game. In 1st innings, one team bat and the other bowls and vice-versa in the second innings.
+
+#### Ball: One throw of the ball by the balling. Similar to pitch in baseball.
+
+#### Over: Six balls make an over.
+
+#### Depending upon the format of game, there are certain number of over available for the teams to bat.
+
+------------------------------------------------------------------------
+
+### Things To know
+
+#### Depending upon the format of game, there are certain number of over available for the teams to bat.
+
+#### The paper uses data from ODIs(One-Day Internationals) that have 50 over each in an innings.
+
+#### The data I have used data from T20s(Twenty-twentys) that have 20 over each in an innings.
+
+#### In these limited overs, the batting teams try to score as runs as possible and the bowling team try to get them out.
+
+------------------------------------------------------------------------
+
+### Things to know
+
+#### The other thing a batting team is limited by is called wickets.
+
+#### Simlar to outs in baseball.
+
+#### There have to be two batsman at the pitch at any given time. So, a team will have 10 wickets each.
+
+#### If a batting team loses all 10 wicket before the avaible overs have been bowled, thw innings is over.
+
+------------------------------------------------------------------------
+
+### In the paper by Asif and McHale
+
+#### They use a dynamic logistic regression to calculate the in-game win probability of a game.
+
+#### They used data from 606 ODI matches.
+
+------------------------------------------------------------------------
+
+### Covariates
+
+------------------------------------------------------------------------
+
+![](Cricket1.png)
+
+---
+
+![Plot of the relationship between wickets lost (w) and wicket resources lost (wrl) for each u=50 (top line), 40, . . . , 10, 5 (bottom line) overs remaining.](Cricket2.png)
+
+--- 
+
+### Method
+#### They tried to find the series of best independent logistic regression for each k = 299, ...,1, where k is the number of balls remaining. 
+#### They used Cross-Validation Delete-d method to identify the best set of covariates that appear at least once in the series of the 299 best logistic models. 
+### Once the covariates were finalized, they smoothed all the covariates one by one to come up with the final model.ß
+
+---
+
+![](Cricket3.png)
+
+![](Cricket4.png)
+---
+
+![](Cricket5.png)
+---
+
+::: {layout="[185,-5,215]"}
+![](Cricket6.png)
+
+![](Cricket7.png)
+:::
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

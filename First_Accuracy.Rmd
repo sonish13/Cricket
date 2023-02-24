@@ -1,0 +1,220 @@
+---
+title: "CV"
+author: "Sonish Lamsal"
+date: "2022-10-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(plyr)
+library(tidyverse)
+source("helpers.R")
+library(lemon)
+library(patchwork)
+library(splines)
+library(gam)
+library(npreg)
+library(zoo)
+library(tictoc)
+knit_print.data.frame <- lemon_print
+```
+
+```{r}
+First_data <- read.csv("First.csv")
+Second_data <- read.csv("Second.csv")
+```
+
+```{r}
+helper_for_coeff_first <- function(data) {
+data_models <- dlply(data, "ball_rem", function(df) 
+  glm(win_loss ~ away + rd + wrl + rpo,
+      family = binomial(link = "logit"), data = df))
+
+# Apply coef to each model and return a data frame
+data_coeff <- ldply(data_models, coef)
+
+# Smooth rpo
+ss_f_rpo <- smooth.spline(x = data_coeff$ball_rem, y = data_coeff$rpo, cv = TRUE)
+df_ss_f_rpo <- data.frame(ball_rem = 1:120, "s_rpo" = ss_f_rpo$y)
+data <- full_join(data, df_ss_f_rpo, by = "ball_rem")
+
+# Refit with smoothed rpo
+data_models_rpo <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ away + rd + wrl + offset(s_rpo * rpo),
+      family = binomial, data = df))
+
+data_coeff_rpo <- ldply(data_models_rpo, coef)
+
+# Smooth rd
+ss_f_rd <- smooth.spline(x = data_coeff_rpo$ball_rem, y = data_coeff_rpo$rd, cv = TRUE)
+df_ss_f_rd <- data.frame(ball_rem = 1:120, "s_rd" = ss_f_rd$y)
+data <- full_join(data, df_ss_f_rd, by = "ball_rem")
+
+# Refit with smoothed rd
+data_models_rd <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ away + offset(s_rd *rd)  +  wrl + offset(s_rpo * rpo),
+      family = binomial, data = df))
+
+data_coeff_rd <- ldply(data_models_rd, coef)
+
+data_coeff_rd$wrl <- na.spline(data_coeff_rd$wrl, na.rm = FALSE)
+
+# Smooth wrl
+ss_f_wrl <- smooth.spline(x = data_coeff_rd$ball_rem, y = data_coeff_rd$wrl, cv = TRUE)
+df_ss_f_wrl <- data.frame(ball_rem = 1:120, "s_wrl" = ss_f_wrl$y)
+data <- full_join(data, df_ss_f_wrl, by = "ball_rem")
+
+# Refit with smoothed wrl
+data_models_wrl <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ away + offset(s_rd *rd)  + offset(s_wrl * wrl) + offset(s_rpo * rpo),
+      family = binomial, data = df))
+
+data_coeff_wrl <- ldply(data_models_wrl, coef)
+
+
+# Smooth away
+ss_f_away <- smooth.spline(x = data_coeff_wrl$ball_rem, y = data_coeff_wrl$away, cv = TRUE)
+df_ss_f_away <- data.frame(ball_rem = 1:120, "s_away" = ss_f_away$y)
+data <- full_join(data, df_ss_f_away, by = "ball_rem")
+
+# Refit with smoothed away
+data_models_away <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ offset(s_away * away) + offset(s_rd *rd)  + offset(s_wrl * wrl) + offset(s_rpo * rpo),
+      family = binomial, data = df))
+
+data_coeff_away <- ldply(data_models_away, coef)
+
+# Smooth intercept
+ss_f_intercept <- smooth.spline(x = data_coeff_away$ball_rem, y = data_coeff_away$`(Intercept)`, cv = TRUE)
+df_ss_f_intercept <- data.frame(ball_rem = 1:120, "s_intercept" = ss_f_intercept$y)
+data <- full_join(data, df_ss_f_intercept, by = "ball_rem")
+
+}
+
+helper_for_error_first <- function(test_df, coeff_df) {
+  df <- left_join(coeff_df, test_df, by = "ball_rem")
+  df |> mutate(prob = 1/(1 + exp(-(s_intercept + s_away * away +
+                                  s_rd * rd + s_wrl * wrl + s_rpo * rpo)))) |> 
+    mutate(pred = prob > 0.5 ) |> 
+    mutate(accurate = (pred == win_loss)) |> 
+    select(id, ball_rem, prob, accurate)
+}
+
+helper_for_LOOCV_first <- function(test_id, df, ...) {
+  vars <- c(...)
+  train <- df |> filter(id != test_id)
+  test <- df |> filter(id == test_id)
+  coeff <- helper_for_coeff_first(train)
+  coeff <- coeff |> 
+    select(ball_rem, s_intercept, s_away,s_rd,s_wrl,s_rpo) |> 
+    group_by(ball_rem) |> 
+    slice_head(n = 1) |> 
+    ungroup()
+  helper_for_error_first(test_df = test, coeff_df = coeff)
+}
+```
+
+```{r message=FALSE, echo=FALSE}
+f_id = First_data$id |> unique()
+first_pred <- f_id |> map_dfr(helper_for_LOOCV_first, df= First_data)
+first_pred |> 
+  group_by(ball_rem) |> 
+  summarise_at(vars(accurate), funs(mean(., na.rm=TRUE))) |> 
+  ggplot(aes(ball_rem, accurate)) +
+  geom_point() +
+  scale_x_reverse() +
+  theme_minimal() +
+  ylab("Accuracy")
+```
+
+```{r}
+helper_for_coeff_second <- function(data) {
+data_models <- dlply(data, "ball_rem", function(df) 
+  glm(win_loss ~ home + wrl +rrpo,
+      family = binomial(link = "logit"), data = df))
+
+# Apply coef to each model and return a data frame
+data_coeff <- ldply(data_models, coef)
+
+# Smooth rrpo
+ss_f_rrpo <- smooth.spline(x = data_coeff$ball_rem, y = data_coeff$rrpo, cv = TRUE)
+df_ss_f_rrpo <- data.frame(ball_rem = 1:120, "s_rrpo" = ss_f_rrpo$y)
+data <- full_join(data, df_ss_f_rrpo, by = "ball_rem")
+
+# Refit with smoothed rrpo
+data_models_rrpo <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ home + wrl + offset(s_rrpo * rrpo),
+      family = binomial, data = df))
+
+data_coeff_rrpo <- ldply(data_models_rrpo, coef)
+
+data_coeff_rrpo$wrl <- na.spline(data_coeff_rrpo$wrl, na.rm = FALSE)
+
+# Smooth wrl
+ss_f_wrl <- smooth.spline(x = data_coeff_rrpo$ball_rem, y = data_coeff_rrpo$wrl, cv = TRUE)
+df_ss_f_wrl <- data.frame(ball_rem = 1:120, "s_wrl" = ss_f_wrl$y)
+data <- full_join(data, df_ss_f_wrl, by = "ball_rem")
+
+# Refit with smoothed wrl
+data_models_wrl <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ home  + offset(s_wrl * wrl) + offset(s_rpo * rpo),
+      family = binomial, data = df))
+
+data_coeff_wrl <- ldply(data_models_wrl, coef)
+
+
+# Smooth away
+ss_f_home <- smooth.spline(x = data_coeff_wrl$ball_rem, y = data_coeff_wrl$home, cv = TRUE)
+df_ss_f_home <- data.frame(ball_rem = 1:120, "s_away" = ss_f_home$y)
+data <- full_join(data, df_ss_f_home, by = "ball_rem")
+
+# Refit with smoothed home
+data_models_home <- dlply(data, "ball_rem", function(df)
+  glm(win_loss ~ offset(s_home * home)  + offset(s_wrl * wrl) + offset(s_rpo * rpo),
+      family = binomial, data = df))
+
+data_coeff_home <- ldply(data_models_home, coef)
+
+# Smooth intercept
+ss_f_intercept <- smooth.spline(x = data_coeff_home$ball_rem, y = data_coeff_home$`(Intercept)`, cv = TRUE)
+df_ss_f_intercept <- data.frame(ball_rem = 1:120, "s_intercept" = ss_f_intercept$y)
+data <- full_join(data, df_ss_f_intercept, by = "ball_rem")
+
+}
+
+helper_for_error_second <- function(test_df, coeff_df) {
+  df <- left_join(coeff_df, test_df, by = "ball_rem")
+  df |> mutate(prob = 1/(1 + exp(-(s_intercept + s_home * home +
+                                     s_wrl * wrl + s_rpo * rpo)))) |> 
+    mutate(pred = prob > 0.5 ) |> 
+    mutate(accurate = (pred == win_loss)) |> 
+    select(id, ball_rem, prob, accurate)
+}
+
+helper_for_LOOCV_second <- function(test_id, df) {
+  train <- df |> filter(id != test_id)
+  test <- df |> filter(id == test_id)
+  coeff <- helper_for_coeff_second(train)
+  coeff <- coeff |> 
+    select(ball_rem, s_intercept, s_home,s_wrl,s_rpo) |> 
+    group_by(ball_rem) |> 
+    slice_head(n = 1) |> 
+    ungroup()
+  helper_for_error_second(test_df = test, coeff_df = coeff)
+}
+```
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,105 @@
+---
+title: "from AIC"
+author: "Sonish Lamsal"
+date: "2023-02-20"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(plyr)
+library(tidyverse)
+source("helpers.R")
+source("helper for smooth coefficient.R")
+library(lemon)
+library(patchwork)
+library(splines)
+library(gam)
+library(npreg)
+library(zoo)
+```
+
+```{r echo=FALSE, message=FALSE}
+First_data <- read.csv("First.csv")
+Second_data <- read.csv("Second.csv")
+
+# Variables from aic 
+# First Innings
+
+helper_for_error <- function(test_df, coeff_df) {
+  df <- left_join(coeff_df, test_df, by = "ball_rem", multiple = "all") 
+  df |> mutate(prob = 1/(1 + exp(-(s_intercept + s_home * home.x + s_away * away.x +
+                                     s_wrl * wrl.x + s_rpo * rpo.x + s_rd * rd.x + s_toss*toss.x)))) |>
+    mutate(pred = prob > 0.5 ) |>
+    mutate(accurate = (pred == win_loss.x)) |>
+    select(id.x, ball_rem, prob, accurate)
+}
+```
+
+```{r echo=FALSE, message=FALSE}
+helper_for_LOOCV <- function(test_id, df, vars =c("rpo","wrl","rd","toss","home","away")) {
+  train <- df |> filter(id != test_id)
+  test <- df |> filter(id == test_id)
+  coeff <- helper_for_coeff(train, vars = vars)
+  coeff <- coeff |> 
+    group_by(ball_rem) |> 
+    slice_head(n = 1) |> 
+    ungroup()
+  coeff
+  helper_for_error(test_df = test, coeff_df = coeff)
+}
+```
+
+```{r}
+f_id = First_data$id |> unique()
+first_pred <- f_id |> map_dfr(helper_for_LOOCV, df= First_data)
+first_pred |>  
+  group_by(ball_rem) |> 
+  summarise_at(vars(accurate), funs(mean(., na.rm=TRUE))) |> 
+  ggplot(aes(ball_rem, accurate)) +
+  geom_point() +
+  scale_x_reverse() +
+  theme_minimal() +
+  ylab("Accuracy")
+```
+
+\newpage
+
+```{r}
+helper_for_error <- function(test_df, coeff_df) {
+  df <- left_join(coeff_df, test_df, by = "ball_rem", multiple = "all") 
+  df |> mutate(prob = 1/(1 + exp(-(s_intercept + s_home * home.x + s_away * away.x +
+                                     s_wrl * wrl.x + s_rpo * rpo.x + s_rd * rd.x + 
+                                     s_toss*toss.x + s_fd * fd.x)))) |>
+    mutate(pred = prob > 0.5 ) |>
+    mutate(accurate = (pred == win_loss.x)) |>
+    select(id.x, ball_rem, prob, accurate)
+}
+```
+
+```{r}
+helper_for_LOOCV <- function(test_id, df, vars =c("rpo","wrl","rd","toss","home","away","fd")) {
+  train <- df |> filter(id != test_id)
+  test <- df |> filter(id == test_id)
+  coeff <- helper_for_coeff(train, vars = vars)
+  coeff <- coeff |> 
+    group_by(ball_rem) |> 
+    slice_head(n = 1) |> 
+    ungroup()
+  coeff
+  helper_for_error(test_df = test, coeff_df = coeff)
+}
+```
+
+```{r}
+s_id = First_data$id |> unique()
+second_pred <- s_id |> map_dfr(helper_for_LOOCV, df= First_data)
+second_pred |> 
+  group_by(ball_rem) |> 
+  summarise_at(vars(accurate), funs(mean(., na.rm=TRUE))) |> 
+  ggplot(aes(ball_rem, accurate)) +
+  geom_point() +
+  scale_x_reverse() +
+  theme_minimal() +
+  ylab("Accuracy")
+```
