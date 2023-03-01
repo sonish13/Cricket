@@ -1,4 +1,32 @@
-library(tidyverse)
+clean_teamnames <- function(string) {
+  unname(c(
+    "Chennai Super Kings"         = "Chennai Super Kings", 
+    
+    "Deccan Chargers"             = "Deccan Chargers / Sunrisers Hyderabad",
+    "Sunrisers Hyderabad"         = "Deccan Chargers / Sunrisers Hyderabad",
+    
+    "Delhi Capitals"              = "Delhi Capitals", 
+    "Delhi Daredevils"            = "Delhi Capitals",
+    
+    "Gujarat Lions"               = "Gujarat Lions", 
+    "Kings XI Punjab"             = "Kings XI Punjab", 
+    "Kochi Tuskers Kerala"        = "Kochi Tuskers Kerala", 
+    "Kolkata Knight Riders"       = "Kolkata Knight Riders", 
+    "Mumbai Indians"              = "Mumbai Indians", 
+    "Rajasthan Royals"            = "Rajasthan Royals",
+    
+    "Pune Warriors"               = "Rising Pune Supergiants", 
+    "Rising Pune Supergiant"      = "Rising Pune Supergiants", 
+    "Rising Pune Supergiants"     = "Rising Pune Supergiants", 
+    
+    "Royal Challengers Bangalore" = "Royal Challengers Bangalore"
+  )[string])
+}
+
+
+
+
+
 
 helper_for_extras <- function(df) {
   df$ball - cumsum((df$extras_type == "noball" | df$extras_type =="wides") |> replace_na(FALSE))
@@ -40,12 +68,7 @@ helper_for_fd <- function(x, w = weights_for_form) {
   weighted.mean(x, w[(7 - length(x)):6])
 }
 
-dl <- read.csv("dl.csv", col.names = c("Overs","w0", "w1","w2","w3","w4","w5","w6","w7","w8","w9"))
-dl_values <- data.frame("Overs" = rep(1:20,6)) |> 
-  arrange(Overs) |>
-  mutate("ball_rem" = 120:1) |> 
-  merge(dl)  |> 
-  arrange(desc(ball_rem))
+
 
 helper_for_start_first <- function(df) {
   x <- df |> slice_head(n=1)
