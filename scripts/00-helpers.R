@@ -22,16 +22,14 @@ clean_teamnames <- function(string) {
     "Royal Challengers Bangalore" = "Royal Challengers Bangalore"
   )[string])
 }
-
-
-
-
-
-
+# Helper to identify the number of extras which is not counted as bals in an over
 helper_for_extras <- function(df) {
-  df$ball - cumsum((df$extras_type == "noball" | df$extras_type =="wides") |> replace_na(FALSE))
+  df$ball - cumsum((df$extras_type == "noball" | df$extras_type =="wides") |>
+                     replace_na(FALSE))
 }
 
+# This function makes the number of balls clean so as we don't have ball number
+# greater than 6 in  our data
 helper_for_grouping <- function(df) {
   df |> 
     group_by(over) |> 
@@ -40,36 +38,38 @@ helper_for_grouping <- function(df) {
                                       replace_na(FALSE)))
 }
 
-Save <- function(df) {
-  path = here::here("data","first",paste0(unique(df$id),".csv"))
-  write_csv(df, path)
-}
+# Save <- function(df) {
+#   path = here::here("data","first",paste0(unique(df$id),".csv"))
+#   write_csv(df, path)
+# }
 
+# helper to calculate home variabke
 helper_for_home <- function(neutral, batting_team, team1) {
   if(neutral) return(0)
   batting_team == team1
 }
 
+# helper to calculate away variable
 helper_for_away <- function(neutral, batting_team, team1) {
   if(neutral) return(0)
   batting_team != team1
 }
 
+# helper to calculate rating difference
 helper_for_difference <- function(team1, team2, batting_team, team1_elo, team2_elo) {
   if(batting_team == team1) return(team1_elo - team2_elo)
   team2_elo - team1_elo
 }
 
 weights_for_form <- c(1,2,3,4,5,0)/15
+# helper to calculate form difference
 
 helper_for_fd <- function(x, w = weights_for_form) {
   if(length(x) == 6) return(weighted.mean(x,w))
   if(length(x) == 1) return(0)
   weighted.mean(x, w[(7 - length(x)):6])
 }
-
-
-
+# helpers to add ball rem = 120 in each games.
 helper_for_start_first <- function(df) {
   x <- df |> slice_head(n=1)
   x$total <- 0
@@ -89,7 +89,22 @@ helper_for_start_second <- function(df) {
   rbind(x, df)
 }
 
-dl_values$w10 <- rep(0, 120)
+# wrapper for bestglm to fit our need
+helper_for_bestglm <- function(df, criteria, response, variables) {
+  X <- df |> select(vars)
+  y <- df |> select(response)
+  XY <- as.data.frame(cbind(X,y))
+  names(Xy) <- c(variables, response)
+  fit <- bestglm(Xy, family = binomial, IC = Criteria)
+  out <- (variables %in% 
+            (fit$BestModel$coefficients |> 
+               names())  ) |> 
+    as.matrix() |> 
+    t() |> 
+    as.data.frame()
+  colnames(out) <- variables
+  out
+}
 
 helper_for_bestglm_first <- function(df, Criteria) {
   X <- df[,c(3:7,9,10)]
